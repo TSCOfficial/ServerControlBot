@@ -28,36 +28,36 @@ public class ChannelService {
             switch (channel.getType()) {
                 case CATEGORY -> {
                     Category category = (Category) channel;
-                    ChannelDTO channelDTO = new ChannelDTO(category.getIdLong(), category.getName(), category.getType().name());
+                    ChannelDTO channelDTO = new ChannelDTO(category.getId(), category.getPosition(), category.getName(), category.getType());
                     validChannels.add(channelDTO);
                 }
 
                 // Text based channels
                 case TEXT -> {
                     TextChannel textChannel = (TextChannel) channel;
-                    ChannelDTO channelDTO = new ChannelDTO(textChannel.getIdLong(), textChannel.getName(), textChannel.getType().name(), textChannel.getTopic());
+                    ChannelDTO channelDTO = new ChannelDTO(textChannel.getId(), textChannel.getPosition(), textChannel.getName(), textChannel.getType(), textChannel.getTopic());
                     validChannels.add(channelDTO);
                 }
                 case NEWS -> {
                     NewsChannel newsChannel = (NewsChannel) channel;
-                    ChannelDTO channelDTO = new ChannelDTO(newsChannel.getIdLong(), newsChannel.getName(), newsChannel.getType().name(), newsChannel.getTopic());
+                    ChannelDTO channelDTO = new ChannelDTO(newsChannel.getId(), newsChannel.getPosition(), newsChannel.getName(), newsChannel.getType().name(), newsChannel.getTopic());
                     validChannels.add(channelDTO);
                 }
                 case FORUM -> {
                     ForumChannel forumChannel = (ForumChannel) channel;
-                    ChannelDTO channelDTO = new ChannelDTO(forumChannel.getIdLong(), forumChannel.getName(), forumChannel.getType().name(), forumChannel.getTopic());
+                    ChannelDTO channelDTO = new ChannelDTO(forumChannel.getId(), forumChannel.getPosition(), forumChannel.getName(), forumChannel.getType().name(), forumChannel.getTopic());
                     validChannels.add(channelDTO);
                 }
 
                 // Voice based channels
                 case VOICE -> {
                     VoiceChannel voiceChannel = (VoiceChannel) channel;
-                    ChannelDTO channelDTO = new ChannelDTO(voiceChannel.getIdLong(), voiceChannel.getName(), voiceChannel.getType().name());
+                    ChannelDTO channelDTO = new ChannelDTO(voiceChannel.getId(), voiceChannel.getPosition(), voiceChannel.getName(), voiceChannel.getType());
                     validChannels.add(channelDTO);
                 }
                 case STAGE -> {
                     StageChannel stageChannel = (StageChannel) channel;
-                    ChannelDTO channelDTO = new ChannelDTO(stageChannel.getIdLong(), stageChannel.getName(), stageChannel.getType().name());
+                    ChannelDTO channelDTO = new ChannelDTO(stageChannel.getId(), stageChannel.getPosition(), stageChannel.getName(), stageChannel.getType());
                     validChannels.add(channelDTO);
                 }
                 default -> {}
@@ -85,37 +85,37 @@ public class ChannelService {
         ChannelType channelType = ChannelType.valueOf(channelDto.type());
         switch (channelType) {
             case CATEGORY -> {
-                CategoryManager categoryManager = guild.getCategoryById(channelDto.channelId()).getManager();
+                CategoryManager categoryManager = guild.getCategoryById(channelDto.id()).getManager();
                 categoryManager.setName(channelDto.name());
                 categoryManager.queue();
             }
             // Text based channels
             case TEXT -> {
-                TextChannelManager textChannelManager = guild.getTextChannelById(channelDto.channelId()).getManager();
+                TextChannelManager textChannelManager = guild.getTextChannelById(channelDto.id()).getManager();
                 textChannelManager.setName(channelDto.name());
                 textChannelManager.setTopic(channelDto.topic());
                 textChannelManager.queue();
             }
             case NEWS -> {
-                NewsChannelManager newsChannelManager = guild.getNewsChannelById(channelDto.channelId()).getManager();
+                NewsChannelManager newsChannelManager = guild.getNewsChannelById(channelDto.id()).getManager();
                 newsChannelManager.setName(channelDto.name());
                 newsChannelManager.setTopic(channelDto.topic());
                 newsChannelManager.queue();
             }
             case FORUM -> {
-                ForumChannelManager forumChannelManager = guild.getForumChannelById(channelDto.channelId()).getManager();
+                ForumChannelManager forumChannelManager = guild.getForumChannelById(channelDto.id()).getManager();
                 forumChannelManager.setName(channelDto.name());
                 forumChannelManager.setTopic(channelDto.topic());
                 forumChannelManager.queue();
             }
             // Voice based channels
             case VOICE -> {
-                VoiceChannelManager voiceChannelManager = guild.getVoiceChannelById(channelDto.channelId()).getManager();
+                VoiceChannelManager voiceChannelManager = guild.getVoiceChannelById(channelDto.id()).getManager();
                 voiceChannelManager.setName(channelDto.name());
                 voiceChannelManager.queue();
             }
             case STAGE -> {
-                StageChannelManager stageChannelManager = guild.getStageChannelById(channelDto.channelId()).getManager();
+                StageChannelManager stageChannelManager = guild.getStageChannelById(channelDto.id()).getManager();
                 stageChannelManager.setName(channelDto.name());
                 stageChannelManager.queue();
             }

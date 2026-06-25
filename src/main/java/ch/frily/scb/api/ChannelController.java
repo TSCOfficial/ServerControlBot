@@ -41,7 +41,7 @@ public class ChannelController {
         try {
             Guild guild = jda.getGuildById(guildId);
             channelDtos.forEach(channelDto -> {
-                if (channelDto.channelId() != null) {
+                if (channelDto.id() != null) {
                     channelService.updateChannel(guild, channelDto);
                 } else {
                     channelService.createChannel(guild, channelDto);

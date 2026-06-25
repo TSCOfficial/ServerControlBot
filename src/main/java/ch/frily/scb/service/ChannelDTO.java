@@ -1,23 +1,20 @@
 package ch.frily.scb.service;
 
 import jakarta.annotation.Nullable;
+import net.dv8tion.jda.api.entities.channel.ChannelType;
 
 public record ChannelDTO (
-        boolean sync,
-        @Nullable Long channelId,
+        @Nullable String id,
+        int position,
         String name,
         String type,
         @Nullable String topic) {
 
-    public ChannelDTO(long id, String name, String type) {
-        this(true, id, name, type, null);
+    public ChannelDTO(String id, int position, String name, ChannelType type) {
+        this(id, position, name, type, null);
     }
 
-    public ChannelDTO(long id, String name, String type, String topic) {
-        this(true, id, name, type, topic);
-    }
-
-    public ChannelDTO(boolean sync, Long channelId, String name, String type) {
-        this(sync, channelId, name, type, null);
+    public ChannelDTO(String id, int position, String name, ChannelType type, String topic) {
+        this(id, position, name, type.name(), topic);
     }
 }
