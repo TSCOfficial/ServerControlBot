@@ -1,5 +1,6 @@
 package ch.frily.scb.service;
 
+import lombok.extern.slf4j.Slf4j;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.channel.ChannelType;
 import net.dv8tion.jda.api.entities.channel.concrete.*;
@@ -10,6 +11,7 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.List;
 
+@Slf4j
 @Service
 public class ChannelService {
 
@@ -24,7 +26,6 @@ public class ChannelService {
         List<ChannelDTO> validChannels = new ArrayList<>();
         for (GuildChannel channel : guildChannels) {
             // Filter out channels that are dependent on other channels (such as Threads)
-            ChannelDTO channelDto;
             switch (channel.getType()) {
                 case CATEGORY -> {
                     Category category = (Category) channel;
