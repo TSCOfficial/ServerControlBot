@@ -6,9 +6,11 @@ import ch.frily.scb.service.ChannelService;
 import lombok.extern.slf4j.Slf4j;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.entities.Guild;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 @Slf4j
 @RestController
@@ -29,7 +31,6 @@ public class ChannelController {
         try {
             Guild guild = jda.getGuildById(guildId);
             List<ChannelDTO> channels = channelService.getChannels(guild);
-            log.info("Channels ({}): {}", channels.size(), channels);
             return channels;
         } catch (Exception exception) {
             return ExceptionHandler.fail(exception);
@@ -37,19 +38,17 @@ public class ChannelController {
     }
 
     @PatchMapping("{guild_id}")
-    public void patchChannels(@PathVariable("guild_id") String guildId, @RequestBody List<ChannelDTO> channelDtos) {
-        try {
-            Guild guild = jda.getGuildById(guildId);
-            channelDtos.forEach(channelDto -> {
-                if (channelDto.id() != null) {
-                    channelService.updateChannel(guild, channelDto);
-                } else {
-                    channelService.createChannel(guild, channelDto);
-                }
-            });
-        } catch (Exception exception) {
-            ExceptionHandler.handle(exception);
+    public CompletableFuture<ResponseEntity<Void>> patchChannels(@PathVariable("guild_id") String guildId, @RequestBody List<ChannelDTO> channelDtos) {
+        Guild guild = jda.getGuildById(guildId);
+        if (guild == null) {
+            return CompletableFuture.completedFuture(ResponseEntity.notFound().build());
         }
 
+        return channelService.bulkPatchChannels(guild, channelDtos)
+                .thenApply(_ -> ResponseEntity.noContent().<Void>build()) // sets type to Void explicitly bc it can happen (through chaining futures), that the type is lost and fallback is Object
+                .exceptionally(exception -> {
+                    ExceptionHandler.handle(exception);
+                    return ResponseEntity.badRequest().build();
+                });
     }
 }
