@@ -9,12 +9,11 @@ import net.dv8tion.jda.api.managers.channel.concrete.*;
 import net.dv8tion.jda.api.requests.restaction.order.ChannelOrderAction;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -129,48 +128,84 @@ public class ChannelService {
             case CATEGORY -> {
                 Category category = guild.getCategoryById(dto.id());
                 if (category == null) throw new IllegalArgumentException("Unknown category: " + dto.id());
-                yield category.getManager().setName(dto.name()).submit();
+                CategoryManager manager = category.getManager();
+                boolean changed = false;
+                if (!category.getName().equals(dto.name())) {
+                    manager.setName(dto.name());
+                    changed = true;
+                }
+                yield changed ? manager.submit() : CompletableFuture.completedFuture(null);
             }
-            // Text-based channels
             case TEXT -> {
                 TextChannel channel = guild.getTextChannelById(dto.id());
                 if (channel == null) throw new IllegalArgumentException("Unknown text channel: " + dto.id());
                 TextChannelManager manager = channel.getManager();
-                manager.setName(dto.name());
-                manager.setTopic(dto.topic());
-                yield manager.submit();
+                boolean changed = false;
+                if (!channel.getName().equals(dto.name())) {
+                    manager.setName(dto.name());
+                    changed = true;
+                }
+                if (!java.util.Objects.equals(channel.getTopic(), dto.topic())) {
+                    manager.setTopic(dto.topic());
+                    changed = true;
+                }
+                yield changed ? manager.submit() : CompletableFuture.completedFuture(null);
             }
             case NEWS -> {
                 NewsChannel channel = guild.getNewsChannelById(dto.id());
                 if (channel == null) throw new IllegalArgumentException("Unknown news channel: " + dto.id());
                 NewsChannelManager manager = channel.getManager();
-                manager.setName(dto.name());
-                manager.setTopic(dto.topic());
-                yield manager.submit();
+                boolean changed = false;
+                if (!channel.getName().equals(dto.name())) {
+                    manager.setName(dto.name());
+                    changed = true;
+                }
+                if (!java.util.Objects.equals(channel.getTopic(), dto.topic())) {
+                    manager.setTopic(dto.topic());
+                    changed = true;
+                }
+                yield changed ? manager.submit() : CompletableFuture.completedFuture(null);
             }
             case FORUM -> {
                 ForumChannel channel = guild.getForumChannelById(dto.id());
                 if (channel == null) throw new IllegalArgumentException("Unknown forum channel: " + dto.id());
                 ForumChannelManager manager = channel.getManager();
-                manager.setName(dto.name());
-                manager.setTopic(dto.topic());
-                yield manager.submit();
+                boolean changed = false;
+                if (!channel.getName().equals(dto.name())) {
+                    manager.setName(dto.name());
+                    changed = true;
+                }
+                if (!java.util.Objects.equals(channel.getTopic(), dto.topic())) {
+                    manager.setTopic(dto.topic());
+                    changed = true;
+                }
+                yield changed ? manager.submit() : CompletableFuture.completedFuture(null);
             }
             // Voice based channels
             case VOICE -> {
                 VoiceChannel channel = guild.getVoiceChannelById(dto.id());
                 if (channel == null) throw new IllegalArgumentException("Unknown voice channel: " + dto.id());
                 VoiceChannelManager manager = channel.getManager();
-                manager.setName(dto.name());
-                yield manager.submit();
+                boolean changed = false;
+                if (!channel.getName().equals(dto.name())) {
+                    manager.setName(dto.name());
+                    changed = true;
+                }
+                yield changed ? manager.submit() : CompletableFuture.completedFuture(null);
             }
             case STAGE -> {
                 StageChannel channel = guild.getStageChannelById(dto.id());
-                if (channel == null) throw new IllegalArgumentException("Unknown stage channel: " + dto.id());
+                if (channel == null) throw new IllegalArgumentException("Unknown voice channel: " + dto.id());
                 StageChannelManager manager = channel.getManager();
-                manager.setName(dto.name());
-                yield manager.submit();
+                boolean changed = false;
+                if (!channel.getName().equals(dto.name())) {
+                    manager.setName(dto.name());
+                    changed = true;
+                }
+                yield changed ? manager.submit() : CompletableFuture.completedFuture(null);
             }
+            // NEWS, FORUM analog zu TEXT (Name + Topic vergleichen)
+            // VOICE, STAGE analog, nur Name vergleichen
             default -> throw new IllegalArgumentException("Unsupported channel type: " + type);
         };
     }
@@ -181,13 +216,15 @@ public class ChannelService {
      *     For each {@link ChannelGroup}, the position-changes are collected and executed together
      * </p>
      */
-    private void applyPositions(Guild guild, List<ChannelDTO> allChannels) {
+    private CompletableFuture<Void> applyPositions(Guild guild, List<ChannelDTO> allChannels, Consumer<ProgressEvent> onProgress) {
         Map<ChannelGroup, List<ChannelDTO>> byGroup = allChannels.stream()
                 .collect(Collectors.groupingBy(dto -> toGroup(ChannelType.valueOf(dto.type()))));
 
-        applyOrderAction(guild, ChannelGroup.CATEGORY, byGroup.get(ChannelGroup.CATEGORY));
-        applyOrderAction(guild, ChannelGroup.TEXT_BASED, byGroup.get(ChannelGroup.TEXT_BASED));
-        applyOrderAction(guild, ChannelGroup.VOICE_BASED, byGroup.get(ChannelGroup.VOICE_BASED));
+        CompletableFuture<Void> categoryFuture = applyOrderAction(guild, ChannelGroup.CATEGORY, byGroup.get(ChannelGroup.CATEGORY), onProgress);
+        CompletableFuture<Void> textFuture = applyOrderAction(guild, ChannelGroup.TEXT_BASED, byGroup.get(ChannelGroup.TEXT_BASED), onProgress);
+        CompletableFuture<Void> voiceFuture = applyOrderAction(guild, ChannelGroup.VOICE_BASED, byGroup.get(ChannelGroup.VOICE_BASED), onProgress);
+
+        return CompletableFuture.allOf(categoryFuture, textFuture, voiceFuture);
     }
 
     /**
@@ -197,43 +234,38 @@ public class ChannelService {
      * @param dtos all channels of the group
      * @return submitted future
      */
-    private void applyOrderAction(Guild guild, ChannelGroup group, List<ChannelDTO> dtos) {
-        if (dtos == null || dtos.isEmpty()) { // if no channels are provided, return as completed
-            return;
+    private CompletableFuture<Void> applyOrderAction(Guild guild, ChannelGroup group, List<ChannelDTO> dtos, Consumer<ProgressEvent> onProgress) {
+        if (dtos == null || dtos.isEmpty()) {
+            return CompletableFuture.completedFuture(null);
         }
 
         List<ChannelDTO> sorted = dtos.stream()
                 .sorted(Comparator.comparingInt(ChannelDTO::position))
                 .toList();
 
-        List<ChannelDTO> uncategorized = sorted.stream()
-                .filter(dto -> dto.parentId() == null)
-                .toList();
-
-        Map<Category, List<ChannelDTO>> groupedByCategory = sorted.stream()
-                .filter(dto -> dto.parentId() != null)
-                .collect(Collectors.groupingBy(category -> guild.getCategoryById(category.parentId())));
-
-        ChannelOrderAction orderAction = null;
-        switch (group) {
-            case CATEGORY:
-                orderAction = guild.modifyCategoryPositions();
-                break;
-            case TEXT_BASED:
-                orderAction = guild.modifyTextChannelPositions();
-                break;
-            case VOICE_BASED:
-                orderAction = guild.modifyVoiceChannelPositions();
-                break;
+        // Kanäle trennen: echte parent_id-Änderung vs. reine Positions-Änderung
+        List<ChannelDTO> parentChanges = new ArrayList<>();
+        for (ChannelDTO dto : sorted) {
+            GuildChannel channel = guild.getGuildChannelById(dto.id());
+            if (channel == null) continue;
+            if (!Objects.equals(currentParentId(channel), dto.parentId())) {
+                parentChanges.add(dto);
+            }
         }
 
-        // execute orderaction per category so that no conflicts occur???
-        ChannelOrderAction finalOrderAction = orderAction;
-        uncategorized.forEach(dto -> {
-            GuildChannel channel = guild.getGuildChannelById(dto.id());
+        int totalSteps = 1 + parentChanges.size();
+        AtomicInteger step = new AtomicInteger(0);
 
-            finalOrderAction.selectPosition(channel).moveTo(dto.position()).queue();
-        });
+        // 1) Ein Sammel-Request: Positionen für ALLE Kanäle der Gruppe, ohne parent_id zu berühren
+        CompletableFuture<Void> chained = sendOrderAction(guild, group, sorted, null, onProgress, step.incrementAndGet(), totalSteps);
+
+        // 2) Für jeden Kanal mit echter Parent-Änderung: eigener, sequenzieller Request
+        for (ChannelDTO target : parentChanges) {
+            chained = chained.thenCompose(ignored ->
+                    sendOrderAction(guild, group, sorted, target, onProgress, step.incrementAndGet(), totalSteps));
+        }
+
+        return chained;
     }
 
     /**
@@ -247,45 +279,101 @@ public class ChannelService {
     }
 
     /**
+     * Sendet einen einzelnen Bulk-Positions-Request.
+     * Ist {@code parentChangeTarget} gesetzt, bekommt NUR dieser eine Kanal
+     * zusätzlich eine neue Kategorie zugewiesen (Discord erlaubt max. 1 pro Request).
+     */
+    private CompletableFuture<Void> sendOrderAction(Guild guild, ChannelGroup group, List<ChannelDTO> sorted,
+                                                    ChannelDTO parentChangeTarget, Consumer<ProgressEvent> onProgress,
+                                                    int step, int totalSteps) {
+        ChannelOrderAction orderAction = switch (group) {
+            case CATEGORY -> guild.modifyCategoryPositions();
+            case TEXT_BASED -> guild.modifyTextChannelPositions();
+            case VOICE_BASED -> guild.modifyVoiceChannelPositions();
+        };
+
+        for (ChannelDTO dto : sorted) {
+            GuildChannel channel = guild.getGuildChannelById(dto.id());
+            if (channel == null) continue;
+
+            ChannelOrderAction selected = orderAction.selectPosition(channel).moveTo(dto.position());
+
+            if (parentChangeTarget != null && dto.id().equals(parentChangeTarget.id())) {
+                Category newParent = dto.parentId() == null ? null : guild.getCategoryById(dto.parentId());
+                selected.setCategory(newParent);
+            }
+        }
+
+        return orderAction.submit().thenAccept(ignored -> {
+            String message = parentChangeTarget != null
+                    ? "Kanal verschoben: " + parentChangeTarget.name()
+                    : "Positionen aktualisiert (" + group + ")";
+            onProgress.accept(new ProgressEvent(group.name(), step, totalSteps, message));
+        });
+    }
+
+    /**
      * Executes the changes given by the frontend in bulk, to prevent to many discord-API requests and conflicts while updating everything
      */
-    public CompletableFuture<Void> bulkPatchChannels(Guild guild, List<ChannelDTO> channelDtos) {
+    public CompletableFuture<Void> bulkPatchChannels(Guild guild, List<ChannelDTO> channelDtos, Consumer<ProgressEvent> onProgress) {
         List<ChannelDTO> channelsToCreate = channelDtos.stream().filter(c -> c.id() == null).toList();
         List<ChannelDTO> channelsToUpdate = channelDtos.stream().filter(c -> c.id() != null).toList();
 
+        int totalCreate = channelsToCreate.size();
+        AtomicInteger createdCount = new AtomicInteger(0);
 
-        // Create channels
         List<CompletableFuture<ChannelDTO>> createFutures = channelsToCreate.stream()
                 .map(dto -> {
                     log.info("Erstelle Channel: {}", dto);
-                    return createChannelAsync(guild, dto).thenApply(createdChannel -> withId(dto, createdChannel.getId()));
+                    return createChannelAsync(guild, dto)
+                            .thenApply(createdChannel -> withId(dto, createdChannel.getId()))
+                            .whenComplete((c, ex) -> {
+                                if (ex == null) {
+                                    onProgress.accept(new ProgressEvent("CREATE",
+                                            createdCount.incrementAndGet(), totalCreate,
+                                            "Kanal erstellt: " + dto.name()));
+                                }
+                            });
                 })
                 .toList();
 
-        // create one future that contains all completed created channels
         CompletableFuture<List<ChannelDTO>> createdAll = CompletableFuture
-                .allOf(createFutures.toArray(new CompletableFuture[0])) // turns a List<CompletableFuture<> to an array (CompletableFuture, CompletableFuture, ...)
+                .allOf(createFutures.toArray(new CompletableFuture[0]))
                 .thenApply(_ -> createFutures.stream().map(CompletableFuture::join).toList());
 
-        // Update channel name & topic
+        int totalMeta = channelsToUpdate.size();
+        AtomicInteger metaCount = new AtomicInteger(0);
+
         List<CompletableFuture<Void>> metaFutures = channelsToUpdate.stream()
-                .map(dto -> {
-                    log.info("Aktualisiere Channel: {}", dto);
-                    return updateChannelMetaAsync(guild, dto);
-                })
+                .map(dto -> updateChannelMetaAsync(guild, dto)
+                        .whenComplete((v, ex) -> {
+                            if (ex == null) {
+                                onProgress.accept(new ProgressEvent("META",
+                                        metaCount.incrementAndGet(), totalMeta,
+                                        "Metadaten geprüft: " + dto.name()));
+                            }
+                        }))
                 .toList();
 
-        // create one future that contains all completed meta-edits
-        CompletableFuture<Void> metaAll = CompletableFuture
-                .allOf(metaFutures.toArray(new CompletableFuture[0]));
+        CompletableFuture<Void> metaAll = CompletableFuture.allOf(metaFutures.toArray(new CompletableFuture[0]));
 
-        // redistribute the new positions
-        return createdAll.thenCombine(metaAll, (created, ignored) -> created)
-                .thenCompose(created -> {
-                    List<ChannelDTO> allPositioned = new ArrayList<>(channelsToUpdate);
-                    allPositioned.addAll(created);
-                    applyPositions(guild, allPositioned);
-                    return CompletableFuture.completedFuture(null);
-                });
+        CompletableFuture<Void> positionFuture = createdAll.thenCompose(created -> {
+            List<ChannelDTO> allPositioned = new ArrayList<>(channelsToUpdate);
+            allPositioned.addAll(created);
+            return applyPositions(guild, allPositioned, onProgress);
+        });
+
+        return CompletableFuture.allOf(positionFuture, metaAll);
+    }
+
+    private String currentParentId(GuildChannel channel) {
+        return switch (channel) {
+            case TextChannel c -> c.getParentCategory() == null ? null : c.getParentCategory().getId();
+            case NewsChannel c -> c.getParentCategory() == null ? null : c.getParentCategory().getId();
+            case ForumChannel c -> c.getParentCategory() == null ? null : c.getParentCategory().getId();
+            case VoiceChannel c -> c.getParentCategory() == null ? null : c.getParentCategory().getId();
+            case StageChannel c -> c.getParentCategory() == null ? null : c.getParentCategory().getId();
+            default -> null;
+        };
     }
 }

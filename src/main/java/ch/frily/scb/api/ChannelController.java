@@ -6,9 +6,12 @@ import ch.frily.scb.service.ChannelService;
 import lombok.extern.slf4j.Slf4j;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.entities.Guild;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
@@ -37,18 +40,37 @@ public class ChannelController {
         }
     }
 
-    @PatchMapping("{guild_id}")
-    public CompletableFuture<ResponseEntity<Void>> patchChannels(@PathVariable("guild_id") String guildId, @RequestBody List<ChannelDTO> channelDtos) {
+    @PatchMapping(value = "{guild_id}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter patchChannels(@PathVariable("guild_id") String guildId, @RequestBody List<ChannelDTO> channelDtos) {
+        SseEmitter emitter = new SseEmitter(0L); // kein Timeout - Dauer hängt von Kanalanzahl ab
+
         Guild guild = jda.getGuildById(guildId);
         if (guild == null) {
-            return CompletableFuture.completedFuture(ResponseEntity.notFound().build());
+            sendSafely(emitter, "error", "Guild nicht gefunden");
+            emitter.complete();
+            return emitter;
         }
 
-        return channelService.bulkPatchChannels(guild, channelDtos)
-                .thenApply(_ -> ResponseEntity.noContent().<Void>build()) // sets type to Void explicitly bc it can happen (through chaining futures), that the type is lost and fallback is Object
-                .exceptionally(exception -> {
-                    ExceptionHandler.handle(exception);
-                    return ResponseEntity.badRequest().build();
+        channelService.bulkPatchChannels(guild, channelDtos, progress -> sendSafely(emitter, "progress", progress))
+                .whenComplete((ignored, exception) -> {
+                    if (exception != null) {
+                        ExceptionHandler.handle(exception);
+                        sendSafely(emitter, "error", exception.getMessage());
+                        emitter.completeWithError(exception);
+                    } else {
+                        sendSafely(emitter, "done", "OK");
+                        emitter.complete();
+                    }
                 });
+
+        return emitter;
+    }
+
+    public void sendSafely(SseEmitter emitter, String eventName, Object data) {
+        try {
+            emitter.send(SseEmitter.event().name(eventName).data(data));
+        } catch (IOException e) {
+            emitter.completeWithError(e);
+        }
     }
 }
