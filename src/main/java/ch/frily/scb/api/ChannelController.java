@@ -30,7 +30,7 @@ public class ChannelController {
     }
 
     @GetMapping("{guild_id}")
-    public List<ChannelDTO> getChannel(@PathVariable("guild_id") String guildId) {
+    public List<ChannelDTO> getChannels(@PathVariable("guild_id") String guildId) {
         try {
             Guild guild = jda.getGuildById(guildId);
             List<ChannelDTO> channels = channelService.getChannels(guild);
