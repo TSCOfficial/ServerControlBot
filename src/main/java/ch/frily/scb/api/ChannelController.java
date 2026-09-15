@@ -42,7 +42,7 @@ public class ChannelController {
 
     @PatchMapping(value = "{guild_id}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter patchChannels(@PathVariable("guild_id") String guildId, @RequestBody List<ChannelDTO> channelDtos) {
-        SseEmitter emitter = new SseEmitter(0L); // kein Timeout - Dauer hängt von Kanalanzahl ab
+        SseEmitter emitter = new SseEmitter(0L);
 
         Guild guild = jda.getGuildById(guildId);
         if (guild == null) {

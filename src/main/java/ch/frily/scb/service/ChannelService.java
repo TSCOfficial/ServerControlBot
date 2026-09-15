@@ -58,6 +58,19 @@ public class ChannelService {
             switch (channel.getType()) {
                 case CATEGORY -> {
                     Category category = (Category) channel;
+                    log.info(category.getName());
+                    log.info(category.getPermissionContainer().getPermissionOverrides().toString());
+                    category.getPermissionContainer().getPermissionOverrides().forEach((permission) -> {
+                        log.info("Allowed: {}", permission.getAllowed().stream().map(perm -> {
+                            return String.format("%s (%d)", perm.getName(), perm.getOffset());
+                        }).toList());
+                        log.info("Denied: {}", permission.getDenied().stream().map(perm -> {
+                            return String.format("%s (%d)", perm.getName(), perm.getOffset());
+                        }).toList());
+                        log.info("Inherit: {}", permission.getInherit().stream().map(perm -> {
+                            return String.format("%s (%d)", perm.getName(), perm.getOffset());
+                        }).toList());
+                    });
                     ChannelDTO channelDTO = new ChannelDTO(category.getId(), category.getPositionRaw(), category.getName(), category.getType(), null);
                     validChannels.add(channelDTO);
                 }
