@@ -12,7 +12,6 @@ import org.springframework.stereotype.Service;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
@@ -261,7 +260,7 @@ public class ChannelService {
         for (ChannelDTO dto : sorted) {
             GuildChannel channel = guild.getGuildChannelById(dto.id());
             if (channel == null) continue;
-            if (!Objects.equals(currentParentId(channel), dto.parentId())) {
+            if (!Objects.equals(currentParentId(channel), dto.parent())) {
                 parentChanges.add(dto);
             }
         }
@@ -288,7 +287,7 @@ public class ChannelService {
      * @return
      */
     private ChannelDTO withId(ChannelDTO dto, String id) {
-        return new ChannelDTO(id, dto.position(), dto.name(), dto.type(), dto.topic(), dto.parentId());
+        return new ChannelDTO(id, dto.position(), dto.name(), dto.type(), dto.topic(), dto.parent());
     }
 
     /**
@@ -312,7 +311,7 @@ public class ChannelService {
             ChannelOrderAction selected = orderAction.selectPosition(channel).moveTo(dto.position());
 
             if (parentChangeTarget != null && dto.id().equals(parentChangeTarget.id())) {
-                Category newParent = dto.parentId() == null ? null : guild.getCategoryById(dto.parentId());
+                Category newParent = dto.parent() == null ? null : guild.getCategoryById(dto.parent().id());
                 selected.setCategory(newParent);
             }
         }
